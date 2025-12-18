@@ -24,13 +24,6 @@ esphome:
           id: total_rainfall
           state: !lambda 'return id(total_rainfall_counter);'
 
-external_components:
-  # Use the LPS22 Sensor External Component from our GitHub
-  - source: github://AeroSteveO/Air-Gradient-Extended
-    components: [ lps22_sensor ]
-    refresh: 0s
-
-
 esp32:
   board: esp32-s3-devkitc-1
   framework:
@@ -62,11 +55,11 @@ light:
 
 api:
   encryption:
-    key: "N3eW7sCX99IdK7QX6iUMihOPGBNz3TjySUOHadLn/Xs="
+    key: "xxxxxxxxxxxxx"
 
 ota:
   - platform: esphome
-    password: "850cc6759288069202820e619c542507"
+    password: "xxxxxxxxxxxxx"
 
 # ==============================================================================
 # Variable
@@ -110,6 +103,11 @@ binary_sensor:
   - platform: status
     name: ${name_device}_Status
 
+# ==============================================================================
+# Test nombre impulsion par tour Anémomètre Misol WH-SP-WS01
+# Résultat : à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
+# ============================================================================== 
+
 #  - platform: gpio
 #    pin:
 #      number: GPIO5
@@ -122,7 +120,6 @@ binary_sensor:
 #    on_press:
 #      - lambda: |-
 #          ESP_LOGI("anemometer_test", "⚡ Pulse détecté !");
-
 
 button:
   - platform: restart
@@ -331,7 +328,6 @@ sensor:
         if (v > max_gust) max_gust = v;
       }
       return max_gust;
-
 
   # Rafale du jour (mise à jour toutes les 10s)
   - platform: template
