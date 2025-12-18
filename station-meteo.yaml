@@ -1,0 +1,533 @@
+substitutions:
+  value_manual_ip: !secret value_manual_ip
+
+# ==============================================================================
+# Info board
+# ==============================================================================
+
+  name_device: "station-meteo"
+  friendly_name: "Station meteo"
+  name_ssid: !secret wifi_ssid
+  password_ssid: !secret wifi_password
+  value_static_ip: ${value_manual_ip}122
+  logger_level: debug
+
+<<: !include .common_minimal.yaml
+
+esphome:
+  name: ${name_device}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -10
+    then:
+      - sensor.template.publish:
+          id: total_rainfall
+          state: !lambda 'return id(total_rainfall_counter);'
+
+external_components:
+  # Use the LPS22 Sensor External Component from our GitHub
+  - source: github://AeroSteveO/Air-Gradient-Extended
+    components: [ lps22_sensor ]
+    refresh: 0s
+
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+  flash_size: 16MB
+
+# ==============================================================================
+# Led RGB board ESP32S3
+# ==============================================================================
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: my_light
+    icon: mdi:led-on
+    rgb_order: GRB
+    pin: GPIO48
+    num_leds: 1
+    #rmt_channel: 0
+    chipset: ws2812
+    name: RGB_LED_${name_device}
+    effects:
+      - pulse:
+          transition_length: 550ms
+          update_interval: 550ms
+
+# ==============================================================================
+# Home Assistant API
+# ==============================================================================
+
+api:
+  encryption:
+    key: "N3eW7sCX99IdK7QX6iUMihOPGBNz3TjySUOHadLn/Xs="
+
+ota:
+  - platform: esphome
+    password: "850cc6759288069202820e619c542507"
+
+# ==============================================================================
+# Variable
+# ==============================================================================
+
+globals:
+  - id: total_rainfall_counter
+    type: int
+    initial_value: '0'
+    restore_value: true  
+
+    # Historique pour rafale 10 minutes (300 points max)
+  - id: wind_history_10m
+    type: std::vector<float>
+    restore_value: false
+
+  # Rafale du jour (max depuis minuit)
+  - id: wind_gust_day
+    type: float
+    initial_value: "0.0"
+    restore_value: false
+
+i2c:
+  - id: bus_a
+    sda: GPIO8
+    scl: GPIO9
+    frequency: 50kHz
+    scan: true
+
+#  - id: bus_b
+#    sda: GPIO17
+#    scl: GPIO18
+#    frequency: 50kHz
+#    scan: true
+
+# ==============================================================================
+# Sensors
+# ============================================================================== 
+
+binary_sensor:
+  - platform: status
+    name: ${name_device}_Status
+
+#  - platform: gpio
+#    pin:
+#      number: GPIO5
+#      mode: INPUT_PULLUP
+#    name: "Test impulsions Anémomètre"
+#    internal: true
+#    filters:
+#      - delayed_on: 1ms   # anti-rebond léger
+#      - delayed_off: 1ms
+#    on_press:
+#      - lambda: |-
+#          ESP_LOGI("anemometer_test", "⚡ Pulse détecté !");
+
+
+button:
+  - platform: restart
+    id: button_restart
+    name: ${name_device}_Restart
+ 
+sensor:
+  - platform: wifi_signal
+    name: ${name_device}_Wifi_signal
+    id: wifi_signal_db
+    update_interval: 60s
+
+  - platform: uptime
+    name: ${name_device}_Uptime
+    icon: mdi:timer
+
+# ------------------------------------------------------------------------------
+# Température humidité SHT35
+# ------------------------------------------------------------------------------
+
+  - platform: sht3xd
+    i2c_id: bus_a
+    temperature:
+      name: "Température"
+      device_class: "temperature"
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+    humidity:
+      name: "Humidité"
+    address: 0x44
+    update_interval: 30s
+
+# ------------------------------------------------------------------------------
+# Luminosité BH1750
+# ------------------------------------------------------------------------------
+
+  - platform: bh1750
+    i2c_id: bus_a
+    name: "Luminosité BH1750 "
+    id: sensor_bh1750
+    internal: true
+    address: 0x23
+    update_interval: 30s
+
+  - platform: template 
+    name: "Luminosité" 
+    unit_of_measurement: "lx"
+    accuracy_decimals: 1
+    icon: mdi:brightness-5
+    update_interval: 30s
+    lambda: |- 
+      return id(sensor_bh1750).state;
+
+# ------------------------------------------------------------------------------
+# UV LTR390
+# ------------------------------------------------------------------------------
+
+  - platform: ltr390
+    i2c_id: bus_a
+    id: my_ltr390
+    uv:
+      id: uv_counts
+      name: "UV Sensor Counts"
+      internal: true
+    ambient_light:
+      id: als_counts
+      name: "Light Sensor Counts"
+      internal: true
+    gain:
+      ambient_light: X9
+      uv: X3
+    resolution:
+      ambient_light: 18
+      uv: 13
+
+  # Conversion UV counts → UV Index calibré
+  - platform: template
+    name: "UV Index"
+    id: uv_index
+    unit_of_measurement: "UVI"
+    icon: "mdi:weather-sunny-alert"
+    update_interval: 30s # 2s
+    lambda: |-
+      const float factor = 2300.0;   // valeur recommandée
+      return id(uv_counts).state / factor;
+
+# ------------------------------------------------------------------------------
+# Pression atmosphérique LPS22HB
+# ------------------------------------------------------------------------------
+
+#  - platform: lps22
+#    i2c_id: bus_b
+#    address: 0x5C
+#    temperature:
+#      name: "LPS22 Temperature"
+#      internal: true
+#      unit_of_measurement: "°C"
+#      accuracy_decimals: 1
+#    pressure:
+#      name: "Pressure"
+#      unit_of_measurement: "hPa"
+#      accuracy_decimals: 2
+
+# ------------------------------------------------------------------------------
+# Précipitation : Pluviomètre Misol WH-SP-RG 
+# ------------------------------------------------------------------------------
+
+  - platform: pulse_meter
+    pin: GPIO6 
+    name: "Précipitation par heure"
+    id: rain_meter
+    icon: "mdi:weather-rainy"
+    internal_filter: 500ms
+    timeout: 45min
+    device_class: "precipitation_intensity"
+    state_class: "total_increasing"
+    unit_of_measurement: "mm/h"
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.3 # 1 pulse = 0.3 mm (valeur constructeur)
+    total:
+      name: "Précipitation journalière"
+      id: total_daily_rainfall
+      icon: "mdi:beaker-outline"
+      device_class: "precipitation"
+      state_class: "total_increasing"
+      unit_of_measurement: "mm"
+      accuracy_decimals: 4
+      filters:
+        - multiply: 0.3 # 1 pulse = 0.3 mm (valeur constructeur)
+      on_value: 
+        then:
+          # Only increment total_rainfall_counter on rain (not on reset at midnight)
+          - lambda: |-
+              if (id(total_daily_rainfall).state != 0) {
+                id(total_rainfall_counter) += 1; 
+              }
+          - sensor.template.publish:
+              id: total_rainfall
+              state: !lambda 'return id(total_rainfall_counter);'
+
+  - platform: template
+    name: "Précipitation totale"
+    id: total_rainfall
+    update_interval: never
+    unit_of_measurement: "mm"
+    icon: "mdi:beaker-outline"
+    device_class: "precipitation"
+    state_class: "total_increasing"
+    accuracy_decimals: 4
+    # Will output total amount of rain over the uptime of the sensor
+    # but we use the count in Home Assistant to get statistics
+    filters:
+      - multiply: 0.3 # 1 pulse = 0.3 mm (valeur constructeur)
+
+# ------------------------------------------------------------------------------
+# Vitesse vent : Anémomètre Misol WH-SP-WS01
+# ------------------------------------------------------------------------------
+ 
+  - platform: pulse_meter
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+    name: "Vitesse du vent"
+    icon: 'mdi:weather-windy'
+    id: wind_speed
+    device_class: "wind_speed"
+    state_class: "measurement"
+    unit_of_measurement: 'km/h'
+    accuracy_decimals: 1
+    internal_filter: 10ms
+    timeout: 2s # Default 5s
+    filters:
+      - multiply: 0.02 # 1/ 60 / 2 * 2,4 = 0,02 (puisqu'à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
+      - throttle_average: 2s
+    on_value:
+      then:
+        - lambda: |-
+            float v = id(wind_speed).state;
+
+            // --- Historique 10 minutes ---
+            id(wind_history_10m).push_back(v);
+            const int max_points = 300; // 10 min glissantes
+            if (id(wind_history_10m).size() > max_points) {
+              id(wind_history_10m).erase(id(wind_history_10m).begin());
+            }
+
+            // --- Rafale du jour ---
+            if (v > id(wind_gust_day)) {
+              id(wind_gust_day) = v;
+            }
+
+  # Rafale 10 minutes glissantes
+  - platform: template
+    name: "Rafale max 10m"
+    id: wind_gust_10m
+    device_class: "wind_speed"
+    state_class: "measurement"
+    unit_of_measurement: 'km/h'
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      if (id(wind_history_10m).empty()) return 0.0;
+      float max_gust = 0.0;
+      for (auto v : id(wind_history_10m)) {
+        if (v > max_gust) max_gust = v;
+      }
+      return max_gust;
+
+
+  # Rafale du jour (mise à jour toutes les 10s)
+  - platform: template
+    name: "Rafale max jour"
+    id: wind_gust_daily
+    device_class: "wind_speed"
+    state_class: "measurement"
+    unit_of_measurement: 'km/h'
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      return id(wind_gust_day);
+
+# ------------------------------------------------------------------------------
+# Direction vent : Girouette Misol MS-WH-SP-WD
+# ------------------------------------------------------------------------------
+
+  - platform: adc
+    id: adc_sensor
+    name: "Direction du vent (tension)"
+    pin: GPIO4
+    attenuation: 12db
+    internal: true
+    update_interval: 5s
+    filters:
+    #  - offset: 0.023 # Calibration
+    accuracy_decimals: 3 ##IMPORTANT to get resolution for resistance sensor
+    on_value:
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 2.85
+              below: 3.1
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "N"
+            - sensor.template.publish:
+                id: dir_vent
+                state: 0.0      
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 2.60
+              below: 2.85
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "NE"         
+            - sensor.template.publish:
+                id: dir_vent
+                state: 45.0            
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 2.25
+              below: 2.55
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "E"                
+            - sensor.template.publish:
+                id: dir_vent
+                state: 90.0          
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 1.20
+              below: 1.50
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "SE"    
+            - sensor.template.publish:
+                id: dir_vent
+                state: 135.0             
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 0.10
+              below: 0.40
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "S"    
+            - sensor.template.publish:
+                id: dir_vent
+                state: 180.0            
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 0.40
+              below: 0.70
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "SW"    
+            - sensor.template.publish:
+                id: dir_vent
+                state: 225.0              
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 0.70
+              below: 1.0
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "W"    
+            - sensor.template.publish:
+                id: dir_vent
+                state: 270.0          
+      - if:
+          condition:
+            sensor.in_range:
+              id: adc_sensor
+              above: 1.75
+              below: 2.05
+          then:
+            - text_sensor.template.publish:
+                id: wind_dir_card
+                state: "NW"    
+            - sensor.template.publish:
+                id: dir_vent
+                state: 315.0
+    ### ADD WIND CARIDNAL DIRECTION
+    ### Your values may differ!
+    # Direction -- Resistance -- ADC Voltage
+    # N -- 2.96v
+    # NE -- 2.75v
+    # E -- 2.4v
+    # SE -- 1.35
+    # S -- 0.25
+    # SW -- 0.55
+    # W -- 0.85
+    # NW -- 1.90
+
+  - platform: template
+    name: "Direction du vent"
+    icon: 'mdi:compass-rose'
+    id: dir_vent
+    unit_of_measurement: "°"
+    accuracy_decimals: 0
+    update_interval: never
+
+# ==============================================================================
+# Text Sensors Direction vent : Girouette Misol MS-WH-SP
+# ==============================================================================
+
+text_sensor:
+  - platform: template
+    name: "Direction cardinale du vent"
+    icon: "mdi:windsock"
+    id: wind_dir_card
+    update_interval: never
+
+# ==============================================================================
+# Bluetooth proxy for sensor plant
+# ==============================================================================
+
+#esp32_ble_tracker:
+#  scan_parameters:
+#    interval: 1100ms
+#    window: 1100ms
+#    active: true
+#    
+#bluetooth_proxy:
+#  active: true
+
+# ==============================================================================
+# Time home assistant
+# ==============================================================================
+
+time:
+  - platform: homeassistant
+    id: esptime
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          - pulse_meter.set_total_pulses:
+              id: rain_meter
+              value: 0
+
+          # Remise à zéro de la rafale jour
+          - lambda: |-
+              id(wind_gust_day) = 0.0;
+              
+          # La pluie journalière doit se remettre à zéro chaque jour, mais pas au reboot
+          - lambda: |-
+              id(total_daily_rainfall).publish_state(0);
