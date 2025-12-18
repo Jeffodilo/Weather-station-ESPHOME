@@ -293,7 +293,7 @@ sensor:
     internal_filter: 10ms
     timeout: 2s # Default 5s
     filters:
-      - multiply: 0.02 # 1/ 60 / 2 * 2,4 = 0,02 (puisqu'à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
+      - multiply: 0.04 # with 0.02 bad value => 1/ 60 / 2 * 2,4 = 0,02 (puisqu'à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
       - throttle_average: 2s
     on_value:
       then:
