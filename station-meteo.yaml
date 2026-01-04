@@ -55,11 +55,11 @@ light:
 
 api:
   encryption:
-    key: "xxxxxxxxxxxxx"
+    key: "xxxxxxxxxxxxxxxxxxxxxxxx"
 
 ota:
   - platform: esphome
-    password: "xxxxxxxxxxxxx"
+    password: "xxxxxxxxxxxxxxxxxxxxxxxx"
 
 # ==============================================================================
 # Variable
@@ -69,18 +69,29 @@ globals:
   - id: total_rainfall_counter
     type: int
     initial_value: '0'
-    restore_value: true  
-
+    restore_value: true
+    
     # Historique pour rafale 10 minutes (300 points max)
   - id: wind_history_10m
     type: std::vector<float>
-    restore_value: false
+    restore_value: false # doit rester à false
 
   # Rafale du jour (max depuis minuit)
   - id: wind_gust_day
     type: float
     initial_value: "0.0"
-    restore_value: false
+    restore_value: true
+
+  # Température min/max de la semaine
+  - id: temp_min_day
+    type: float
+    initial_value: "0.0"
+    restore_value: true
+  
+  - id: temp_max_day
+    type: float
+    initial_value: "0.0"
+    restore_value: true
 
 i2c:
   - id: bus_a
@@ -103,11 +114,6 @@ binary_sensor:
   - platform: status
     name: ${name_device}_Status
 
-# ==============================================================================
-# Test nombre impulsion par tour Anémomètre Misol WH-SP-WS01
-# Résultat : à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
-# ============================================================================== 
-
 #  - platform: gpio
 #    pin:
 #      number: GPIO5
@@ -121,11 +127,23 @@ binary_sensor:
 #      - lambda: |-
 #          ESP_LOGI("anemometer_test", "⚡ Pulse détecté !");
 
+
 button:
   - platform: restart
     id: button_restart
     name: ${name_device}_Restart
- 
+
+  # Bouton pour reset les stats hebdomadaires manuellement
+  - platform: template
+    name: "Reset statistiques"
+    icon: "mdi:restart"
+    on_press:
+      - lambda: |-
+          id(rain_meter).publish_state(0);
+          id(total_daily_rainfall).publish_state(0);
+          id(wind_gust_day) = 0.0;
+          ESP_LOGI("reset", "Stats hebdo réinitialisées");
+
 sensor:
   - platform: wifi_signal
     name: ${name_device}_Wifi_signal
@@ -144,13 +162,49 @@ sensor:
     i2c_id: bus_a
     temperature:
       name: "Température"
+      id: temp_outdoor
       device_class: "temperature"
       unit_of_measurement: "°C"
       accuracy_decimals: 1
+      on_value: 
+        then:
+          - lambda: |-
+              float t = id(temp_outdoor).state;
+              if (t < id(temp_min_day)) id(temp_min_day) = t;
+              if (t > id(temp_max_day)) id(temp_max_day) = t;
     humidity:
       name: "Humidité"
+      id: humidity_outdoor
     address: 0x44
     update_interval: 30s
+
+# ==============================================================================
+# STATISTIQUES HEBDOMADAIRES
+# ==============================================================================
+
+  # Température min du jour
+  - platform: template
+    name: "Température mini jour"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    icon: "mdi:thermometer-chevron-down"
+    update_interval: 60s
+    lambda: |-
+      return id(temp_min_day);
+
+  # Température max du jour
+  - platform: template
+    name: "Température maxi jour"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    icon: "mdi:thermometer-chevron-up"
+    update_interval: 60s
+    lambda: |-
+      return id(temp_max_day);
 
 # ------------------------------------------------------------------------------
 # Luminosité BH1750
@@ -237,7 +291,7 @@ sensor:
     device_class: "precipitation_intensity"
     state_class: "total_increasing"
     unit_of_measurement: "mm/h"
-    accuracy_decimals: 2
+    accuracy_decimals: 4
     filters:
       - multiply: 0.3 # 1 pulse = 0.3 mm (valeur constructeur)
     total:
@@ -270,8 +324,6 @@ sensor:
     device_class: "precipitation"
     state_class: "total_increasing"
     accuracy_decimals: 4
-    # Will output total amount of rain over the uptime of the sensor
-    # but we use the count in Home Assistant to get statistics
     filters:
       - multiply: 0.3 # 1 pulse = 0.3 mm (valeur constructeur)
 
@@ -293,7 +345,7 @@ sensor:
     internal_filter: 10ms
     timeout: 2s # Default 5s
     filters:
-      - multiply: 0.04 # with 0.02 bad value => 1/ 60 / 2 * 2,4 = 0,02 (puisqu'à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
+      - multiply: 0.04 # 1/ 60 / 2 * 2,4 = 0,02 (puisqu'à 2,4 km/h, l'anémomètre effectue un tour complet en une seconde et génère deux impulsions)
       - throttle_average: 2s
     on_value:
       then:
@@ -314,7 +366,7 @@ sensor:
 
   # Rafale 10 minutes glissantes
   - platform: template
-    name: "Rafale max 10m"
+    name: "Rafale 10m"
     id: wind_gust_10m
     device_class: "wind_speed"
     state_class: "measurement"
@@ -328,6 +380,7 @@ sensor:
         if (v > max_gust) max_gust = v;
       }
       return max_gust;
+
 
   # Rafale du jour (mise à jour toutes les 10s)
   - platform: template
@@ -523,7 +576,15 @@ time:
           # Remise à zéro de la rafale jour
           - lambda: |-
               id(wind_gust_day) = 0.0;
-              
+
           # La pluie journalière doit se remettre à zéro chaque jour, mais pas au reboot
           - lambda: |-
               id(total_daily_rainfall).publish_state(0);
+
+          - lambda: |-
+              id(rain_meter).publish_state(0);
+
+          # Remise à zéro température mini et maxi du jour
+          - lambda: |-
+              id(temp_min_day) = 0.0;
+              id(temp_max_day) = 0.0;
