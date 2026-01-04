@@ -1,0 +1,232 @@
+type: vertical-stack
+cards:
+  - type: horizontal-stack
+    cards:
+      - type: custom:mini-graph-card
+        color_thresholds:
+          - color: "#0000ff"
+            value: 0
+          - color: "#0020ff"
+            value: 2
+          - color: "#0040ff"
+            value: 4
+          - color: "#0060ff"
+            value: 6
+          - color: "#0080ff"
+            value: 8
+          - color: "#00a0ff"
+            value: 10
+          - color: "#00c0ff"
+            value: 12
+          - color: "#00e0ff"
+            value: 14
+          - color: "#00ffff"
+            value: 15
+          - color: "#00ff80"
+            value: 16
+          - color: "#40ff40"
+            value: 17
+          - color: "#80ff00"
+            value: 18
+          - color: "#80ff00"
+            value: 19
+          - color: "#ffff00"
+            value: 20
+          - color: "#ffe000"
+            value: 21
+          - color: "#ffc000"
+            value: 22
+          - color: "#ffd000"
+            value: 23
+          - color: "#ffa500"
+            value: 24
+          - color: "#ff9400"
+            value: 25
+          - color: "#ff8800"
+            value: 26
+          - color: "#ff8000"
+            value: 27
+          - color: "#ff8000"
+            value: 28
+          - color: "#ff0000"
+            value: 30
+          - color: "#e00000"
+            value: 32
+          - color: "#c00000"
+            value: 34
+          - color: "#b00000"
+            value: 36
+        color_thresholds_transition: smooth
+        entities:
+          - entity: sensor.station_meteo_temperature
+            name: Temperature
+        decimals: 1
+        group: false
+        hour24: true
+        line_width: 2
+        points_per_hour: 4
+        show:
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true
+      - type: custom:mini-graph-card
+        color_thresholds:
+          - color: "#fe2712"
+            value: 40
+          - color: "#fefe33"
+            value: 60
+          - color: "#66b032"
+            value: 80
+          - color: "#0000cd"
+            value: 90
+        color_thresholds_transition: smooth
+        entities:
+          - entity: sensor.station_meteo_humidite
+            name: Humidité
+        decimals: 0
+        group: false
+        hour24: true
+        line_width: 2
+        points_per_hour: 4
+        show:
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true
+  - type: horizontal-stack
+    cards:
+      - type: custom:mini-graph-card
+        color_thresholds:
+          - color: "#0000cd"
+            value: 10
+          - color: "#00BFFF"
+            value: 0
+        color_thresholds_transition: smooth
+        entities:
+          - entity: sensor.station_meteo_precipitation_journaliere
+            name: Pluie jour
+        decimals: 1
+        group: false
+        hour24: false
+        hours_to_show: 24
+        show:
+          graph: bar
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true
+      - type: custom:mini-graph-card
+        color_thresholds:
+          - color: "#0000cd"
+            value: 10
+          - color: "#00BFFF"
+            value: 0
+        color_thresholds_transition: smooth
+        entities:
+          - entity: sensor.station_meteo_precipitation_par_heure
+            name: Pluie ratio
+        group: false
+        hour24: false
+        hours_to_show: 24
+        show:
+          graph: bar
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true
+  - type: horizontal-stack
+    cards:
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.station_meteo_luminosite
+            name: Luminosité
+            format: precision 1
+        color_thresholds:
+          - color: "#ff3b30"
+            value: 25000
+          - color: "#ff8a65"
+            value: 15000
+          - color: "#ffcc80"
+            value: 10000
+          - color: "#fff9c4"
+            value: 5000
+          - color: "#dcedc8"
+            value: 2500
+          - color: "#a5d6a7"
+            value: 1000
+          - color: "#81c784"
+            value: 0
+        color_thresholds_transition: smooth
+        decimals: 0
+        group: false
+        hour24: true
+        line_width: 2
+        points_per_hour: 4
+        show:
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.station_meteo_uv_index
+            name: UV Index
+        color_thresholds:
+          - color: "#e1011b"
+            value: 11
+          - color: "#e94153"
+            value: 8
+          - color: "#ffa304"
+            value: 6
+          - color: "#ffb636"
+            value: 3
+          - color: "#72c900"
+            value: 0
+        color_thresholds_transition: hard
+        decimals: 1
+        group: false
+        hour24: true
+        line_width: 2
+        points_per_hour: 4
+        show:
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true
+  - type: horizontal-stack
+    cards:
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.bain_de_bretagne_pressure
+            name: Pression
+        color_thresholds:
+          - color: "#ffcc33"
+            value: 1025
+          - color: "#00B7eb"
+            value: 975
+        color_thresholds_transition: smooth
+        decimals: 0
+        group: false
+        hour24: true
+        line_width: 2
+        points_per_hour: 4
+        show:
+          extrema: true
+          fill: fade
+          icon: true
+          labels: false
+          name: true
+          state: true

@@ -1,0 +1,58 @@
+type: horizontal-stack
+cards:
+  - type: custom:mini-graph-card
+    entities:
+      - entity: sensor.station_meteo_vitesse_du_vent
+        name: Vitesse vent
+    color_thresholds:
+      - color: "#fa00ff"
+        value: 80
+      - color: "#fdb5aa"
+        value: 70
+      - color: "#fdb5aa"
+        value: 50
+      - color: "#ffffbb"
+        value: 30
+      - color: "#82c93f"
+        value: 0
+    color_thresholds_transition: hard
+    decimals: 0
+    group: false
+    hour24: true
+    line_width: 2
+    points_per_hour: 4
+    show:
+      extrema: true
+      fill: fade
+      icon: true
+      labels: false
+      name: true
+      state: true
+  - type: custom:mini-graph-card
+    entities:
+      - entity: sensor.station_meteo_rafale_10m
+        name: Rafale 10 min
+    color_thresholds:
+      - color: "#fa00ff"
+        value: 80
+      - color: "#fdb5aa"
+        value: 60
+      - color: "#fdb5aa"
+        value: 40
+      - color: "#ffffbb"
+        value: 20
+      - color: "#82c93f"
+        value: 0
+    color_thresholds_transition: hard
+    decimals: 0
+    group: false
+    hour24: true
+    line_width: 2
+    points_per_hour: 4
+    show:
+      extrema: true
+      fill: fade
+      icon: true
+      labels: false
+      name: true
+      state: true
