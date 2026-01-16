@@ -55,11 +55,11 @@ light:
 
 api:
   encryption:
-    key: "xxxxxxxxxxxxxxxxxxxxxxxx"
+    key: "xxxxxxxxxxxxx"
 
 ota:
   - platform: esphome
-    password: "xxxxxxxxxxxxxxxxxxxxxxxx"
+    password: "xxxxxxxxxxxxx"
 
 # ==============================================================================
 # Variable
@@ -236,29 +236,34 @@ sensor:
     id: my_ltr390
     uv:
       id: uv_counts
-      name: "UV Sensor Counts"
+      name: "UV Raw"
       internal: true
     ambient_light:
       id: als_counts
-      name: "Light Sensor Counts"
       internal: true
     gain:
-      ambient_light: X9
       uv: X3
+      ambient_light: X9
     resolution:
+      uv: 18
       ambient_light: 18
-      uv: 13
 
-  # Conversion UV counts → UV Index calibré
+  # UV_SENSITIVITY = UV_raw / UVI_ref // UV mesuré par station → UVI_ref // UV_counts ESPHome → UV_raw
   - platform: template
     name: "UV Index"
-    id: uv_index
     unit_of_measurement: "UVI"
     icon: "mdi:weather-sunny-alert"
-    update_interval: 30s # 2s
+    update_interval: 30s
     lambda: |-
-      const float factor = 2300.0;   // valeur recommandée
-      return id(uv_counts).state / factor;
+
+      if (isnan(id(uv_counts).state)) return NAN;
+
+      const float UV_SENSITIVITY = 2500.0; // point de départ réaliste
+      return id(uv_counts).state / UV_SENSITIVITY;
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
 
 # ------------------------------------------------------------------------------
 # Pression atmosphérique LPS22HB
@@ -283,17 +288,20 @@ sensor:
 
   - platform: pulse_meter
     pin: GPIO6 
-    name: "Précipitation par heure"
+    name: "Intensité de pluie"
     id: rain_meter
     icon: "mdi:weather-rainy"
     internal_filter: 500ms
     timeout: 45min
-    device_class: "precipitation_intensity"
-    state_class: "total_increasing"
+    device_class: precipitation_intensity
+    state_class: measurement
     unit_of_measurement: "mm/h"
-    accuracy_decimals: 4
+    accuracy_decimals: 2
     filters:
-      - multiply: 0.3 # 1 pulse = 0.3 mm (valeur constructeur)
+      # pulse_meter = pulses / minute
+      # 1 pulse = 0.3 mm
+      # conversion en heure → ×60
+      - multiply: 18   # 0.3 × 60
     total:
       name: "Précipitation journalière"
       id: total_daily_rainfall
